@@ -1,0 +1,19 @@
+# Байт-код Python
+__pycache__/
+*.py[cod]
+*$py.class
+*Zone.Identifier
+
+# Данные (не пушим сырые матрицы и таргеты в GitHub)
+data/
+
+# Логи и результаты расчетов
+*.log
+*.out
+*.dat
+reports/psi4_logs/
+src/dft/reports/
+
+# Среды
+.env
+.venv

@@ -1,0 +1,26 @@
+# Установка: conda env create -f environment.yml && conda activate flotation-collectors
+#
+# Psi4 ставится ТОЛЬКО через conda(-forge), pip-пакета нет.
+# RDKit можно и через conda, и через pip (rdkit-pypi) -- здесь через conda
+# для единообразия и меньшего риска конфликтов бинарных зависимостей.
+
+name: flotation-collectors
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - psi4
+  - rdkit
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - matplotlib
+  - plotly
+  - streamlit
+  - jupyter
+  - pytest
+  - pyarrow
+  - pip
+  - pip:
+      - statsmodels
