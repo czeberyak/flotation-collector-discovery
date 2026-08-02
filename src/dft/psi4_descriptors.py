@@ -1,9 +1,15 @@
 """
 DFT-дескрипторы молекул-кандидатов через Psi4.
 
-Уровень теории по умолчанию изменен на B3LYP/6-31+G*, так как добавление 
-диффузных функций (+) критически важно для корректной оптимизации 
+Уровень теории по умолчанию изменен на B3LYP/6-31+G*, так как добавление
+диффузных функций (+) критически важно для корректной оптимизации
 геометрии и расчета орбиталей заряженных частиц (анионов ксантогенатов).
+
+smiles_to_xyz_block генерирует несколько конформеров (не один) и
+оставляет лучший по UFF-энергии как старт для DFT -- для длинных/
+разветвлённых цепей (C7-C10) один случайный сид может дать неудачную
+стартовую геометрию, которую DFT-оптимизатор потом долго и не всегда
+успешно вытягивает к минимуму.
 """
 from __future__ import annotations
 
@@ -26,6 +32,13 @@ class DFTDescriptors:
 
 
 def smiles_to_xyz_block(smiles: str, seed: int = 42, num_confs: int = 10) -> str:
+    """
+    SMILES -> 3D-геометрия в формате, который понимает psi4.geometry().
+
+    Генерирует num_confs конформеров через RDKit, для каждого делает
+    UFF-минимизацию, возвращает геометрию конформера с наименьшей
+    UFF-энергией. Стоимость -- только UFF (секунды), не DFT.
+    """
     mol = Chem.MolFromSmiles(smiles)
     assert mol is not None, f"невалидный SMILES: {smiles}"
     mol = Chem.AddHs(mol)
@@ -41,53 +54,49 @@ def smiles_to_xyz_block(smiles: str, seed: int = 42, num_confs: int = 10) -> str
     for cid in conf_ids:
         ff = AllChem.UFFGetMoleculeForceField(mol, confId=cid)
         ff.Minimize()
-        e = ff.CalcEnergy()
-        if e < best_energy:
-            best_cid, best_energy = cid, e
+        energy = ff.CalcEnergy()
+        if energy < best_energy:
+            best_cid, best_energy = cid, energy
 
     conf = mol.GetConformer(best_cid)
     lines = []
     for atom in mol.GetAtoms():
         pos = conf.GetAtomPosition(atom.GetIdx())
         lines.append(f"{atom.GetSymbol()} {pos.x:.6f} {pos.y:.6f} {pos.z:.6f}")
+
+    # Ксантогенаты -- анионы. Жестко задаем заряд -1 и мультиплетность 1
     return "-1 1\n" + "\n".join(lines)
 
 
 def compute_dft_descriptors(name: str, smiles: str,
                              functional: str = "b3lyp",
-                             basis: str = "6-31+G*") -> DFTDescriptors:
+                             basis: str = "6-31+G*",
+                             num_confs: int = 10) -> DFTDescriptors:
     """
-    Выполняет квантово-химическую оптимизацию геометрии и рассчитывает 
+    Выполняет квантово-химическую оптимизацию геометрии и рассчитывает
     дескрипторы граничных орбиталей (HOMO/LUMO) и дипольный момент.
     """
-    import os
     os.makedirs("reports/psi4_logs", exist_ok=True)
-    
     psi4.core.set_output_file(f"reports/psi4_logs/{name}.log", False)
 
-    geom_block = smiles_to_xyz_block(smiles)
+    geom_block = smiles_to_xyz_block(smiles, num_confs=num_confs)
     mol = psi4.geometry(geom_block)
 
-    psi4.set_options({"reference": "rhf"})  
+    psi4.set_options({"reference": "rhf"})
     level_of_theory = f"{functional}/{basis}"
 
-    # Оптимизация геометрии + расчет энергии
     scf_energy, wfn = psi4.optimize(
         level_of_theory, molecule=mol, return_wfn=True
     )
 
-    # Извлечение энергий орбиталей
     eps_a = wfn.epsilon_a_subset("AO", "ALL").np
     n_occ = wfn.nalpha()
-    
+
     homo = eps_a[n_occ - 1]
     lumo = eps_a[n_occ]
     HARTREE_TO_EV = 27.2114
 
-    # Извлечение дипольного момента для Psi4 >= 1.6
-    # Возвращает массив [x, y, z] в атомных единицах (a.u. / e-bohr)
     dipole_au = psi4.variable("SCF DIPOLE")
-    # Считаем длину вектора и переводим в Дебаи (1 a.u. = 2.541746 Debye)
     dipole_debye = float(sum(d**2 for d in dipole_au) ** 0.5) * 2.541746
 
     return DFTDescriptors(
@@ -101,16 +110,15 @@ def compute_dft_descriptors(name: str, smiles: str,
 
 
 if __name__ == "__main__":
-    # Локальный тест модуля на этилксантогенате
     psi4.set_memory("2 GB")
     psi4.set_num_threads(4)
-    
+
     test_name = "ethyl"
     test_smiles = "CCOC(=S)[S-]"
-    
+
     print(f"Запуск тестового расчета для {test_name} ({test_smiles})...")
     result = compute_dft_descriptors(test_name, test_smiles)
-    
+
     print("\n--- Результаты ---")
     print(f"HOMO:   {result.homo_ev:.4f} eV")
     print(f"LUMO:   {result.lumo_ev:.4f} eV")
