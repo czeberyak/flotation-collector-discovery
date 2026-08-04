@@ -39,11 +39,12 @@ FIELDNAMES = ["name", "smiles", "n_carbons", "branched", "gap_ev",
               "gap_source", "recovery", "selectivity", "desirability"]
 
 
-def _surrogate_feature_vector(n_carbons: int, branched: int, mol_weight: float,
-                               logp: float, tpsa: float) -> list[float]:
+def _surrogate_feature_vector(n_carbons: int, branched: int, branch_distance: int,
+                               mol_weight: float, logp: float, tpsa: float) -> list[float]:
     feat_values = {
         "n_carbons": n_carbons, "branched": branched,
         "branched_x_n": branched * n_carbons,
+        "branch_distance": branch_distance,
         "mol_weight": mol_weight, "logp": logp, "tpsa": tpsa,
     }
     return [feat_values[f] for f in SURROGATE_FEATURES]
@@ -80,7 +81,7 @@ def score_expanded_candidates(surrogates: dict) -> list[dict]:
             rd = rdkit_descriptors(r["smiles"])
             n, branched = rd["n_carbons"], int(rd["branched"])
             x = [_surrogate_feature_vector(
-                n, branched, rd["mol_weight"], rd["logp"], rd["tpsa"]
+                n, branched, rd["branch_distance"], rd["mol_weight"], rd["logp"], rd["tpsa"]
             )]
             gap_pred = float(surrogates["gap_ev"].predict(x)[0])
 

@@ -26,6 +26,8 @@ from pathlib import Path
 
 from rdkit import Chem
 
+from src.molecules.candidate_library import build_candidate_library
+
 OUTPUT_CSV = Path("data/02_interim/expanded_candidates.csv")
 
 XANTHATE_SUFFIX = "OC(=S)[S-]"  # та же ксантогенатная голова, что и в
@@ -83,12 +85,26 @@ def build_xanthate_smiles(alkyl_fragment: str) -> str:
     return alkyl_fragment + XANTHATE_SUFFIX
 
 
+def _original_canonical_smiles() -> set[str]:
+    """Канонические SMILES исходных 15 -- исключить их из расширенной
+    библиотеки: не имеет смысла дублировать структуру с предсказанным
+    gap, если для неё уже есть настоящий DFT."""
+    canon = set()
+    for c in build_candidate_library():
+        mol = Chem.MolFromSmiles(c.smiles)
+        if mol is not None:
+            canon.add(Chem.MolToSmiles(mol))
+    return canon
+
+
 def main() -> None:
     fragments = generate_alkyl_fragments()
     print(f"Сгенерировано алкильных фрагментов (до RDKit-дедупликации): {len(fragments)}")
 
+    original = _original_canonical_smiles()
     seen_canonical: dict[str, str] = {}  # canonical_smiles -> первый исходный SMILES
     invalid = 0
+    already_original = 0
     for frag in fragments:
         smiles = build_xanthate_smiles(frag)
         mol = Chem.MolFromSmiles(smiles)
@@ -96,10 +112,15 @@ def main() -> None:
             invalid += 1
             continue
         canonical = Chem.MolToSmiles(mol)
+        if canonical in original:
+            already_original += 1
+            continue
         seen_canonical.setdefault(canonical, smiles)
 
     if invalid:
         print(f"Невалидных SMILES (отброшены): {invalid}")
+    if already_original:
+        print(f"Уже есть в исходных 15 с настоящим DFT (исключены отсюда): {already_original}")
 
     rows = []
     for i, canonical in enumerate(sorted(seen_canonical), start=1):

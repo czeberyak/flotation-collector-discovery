@@ -33,8 +33,12 @@ from sklearn.preprocessing import StandardScaler
 DATASET_CSV = Path("data/03_processed/qspr_dataset.csv")
 
 # ТОЛЬКО RDKit-фичи -- ни одного DFT-значения на входе, иначе смысл
-# суррогата (для кандидатов БЕЗ реального DFT) теряется
-FEATURES = ["n_carbons", "branched", "branched_x_n", "mol_weight", "logp", "tpsa"]
+# суррогата (для кандидатов БЕЗ реального DFT) теряется.
+# branch_distance -- расстояние от корня до ближайшей развилки (-1 =
+# нет ветки); без неё все изомеры одной длины с одинаковым branched
+# были неразличимы -- см. README, известное ограничение Недели 3.
+FEATURES = ["n_carbons", "branched", "branched_x_n", "branch_distance",
+            "mol_weight", "logp", "tpsa"]
 TARGETS = ["homo_ev", "gap_ev"]
 
 
@@ -49,6 +53,7 @@ def load_dataset(csv_path: Path):
                 "n_carbons": n,
                 "branched": branched,
                 "branched_x_n": branched * n,
+                "branch_distance": float(row["branch_distance"]),
                 "mol_weight": float(row["mol_weight"]),
                 "logp": float(row["logp"]),
                 "tpsa": float(row["tpsa"]),

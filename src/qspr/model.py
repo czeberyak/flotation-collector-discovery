@@ -29,8 +29,8 @@ from sklearn.preprocessing import StandardScaler
 DATASET_CSV = Path("data/03_processed/qspr_dataset.csv")
 
 FEATURES = [
-    "n_carbons", "branched", "branched_x_n", "mol_weight", "logp", "tpsa",
-    "homo_ev", "gap_ev",
+    "n_carbons", "branched", "branched_x_n", "branch_distance",
+    "mol_weight", "logp", "tpsa", "homo_ev", "gap_ev",
 ]
 TARGETS = ["recovery", "selectivity"]
 
@@ -40,6 +40,9 @@ TARGETS = ["recovery", "selectivity"]
 # branched_x_n -- interaction term: без него линейная модель не может
 # выразить branching-эффект, меняющий знак в зависимости от длины цепи
 # (короткие разветвлённые лучше прямых аналогов, длинные -- хуже).
+# branch_distance -- расстояние от корня до ближайшей развилки (-1 =
+# нет ветки): без неё изомеры одной длины с одинаковым branched были
+# неразличимы (MW/LogP/TPSA локально-аддитивны, не видят позицию).
 
 
 def load_dataset(csv_path: Path):
@@ -53,6 +56,7 @@ def load_dataset(csv_path: Path):
                 "n_carbons": n,
                 "branched": branched,
                 "branched_x_n": branched * n,
+                "branch_distance": float(row["branch_distance"]),
                 "mol_weight": float(row["mol_weight"]),
                 "logp": float(row["logp"]),
                 "tpsa": float(row["tpsa"]),

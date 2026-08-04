@@ -14,6 +14,7 @@ Featurization: RDKit структурные дескрипторы + объед�
 from __future__ import annotations
 
 import csv
+from collections import deque
 from pathlib import Path
 
 from rdkit import Chem
@@ -61,17 +62,21 @@ def _find_alpha_carbon(mol):
     raise ValueError("эфирный O не присоединён к алкильной цепи")
 
 
-def is_branched_alkyl(mol) -> bool:
+def branch_distance_from_root(mol) -> int | None:
     """
-    Разветвлена ли алкильная цепь (не считая тиокарбонатного C).
+    Расстояние (число связей) от корня (alpha-углерод, у O) до
+    БЛИЖАЙШЕЙ точки ветвления. None, если разветвлений нет.
 
-    Правило: у корня (alpha-углерод, присоединённый к O) любая
-    углерод-углеродная связь уже означает развилку -- в отличие от
-    всех остальных углеродов цепи, у корня нет связи "назад". У
-    любого не-корневого узла развилка -- это 2+ дочерних углерода
-    (то есть carbon-degree >= 3, если считать и связь к родителю).
-    Даёт корректный ответ и для isopropyl (развилка в корне), и для
-    isobutyl/isoamyl/2-ethylhexyl (развилка на 1-2 шага вглубь).
+    0 -- ветка прямо в корне (isopropyl-тип). 1 -- ветка на первом шаге
+    вглубь (isobutyl-тип). И т.д. BFS, не DFS -- гарантирует, что при
+    нескольких развилках находится САМАЯ БЛИЖНЯЯ, а не первая попавшаяся
+    в порядке обхода.
+
+    Отдельная фича, не просто is_branched_alkyl: молекулярная масса,
+    LogP (Crippen) и TPSA -- все локально-аддитивные по типам атомов и
+    НЕ различают, где именно на цепи сидит развилка (см. README,
+    известное ограничение скрининга Недели 3). Эта фича даёт то самое
+    разрешение, которого не хватало.
     """
     alpha = _find_alpha_carbon(mol)
 
@@ -79,20 +84,26 @@ def is_branched_alkyl(mol) -> bool:
         return [n for n in atom.GetNeighbors() if n.GetSymbol() == "C"]
 
     if len(carbon_neighbors(alpha)) >= 2:
-        return True
+        return 0
 
     visited = {alpha.GetIdx()}
-    stack = [(n, alpha) for n in carbon_neighbors(alpha)]
-    while stack:
-        atom, parent = stack.pop()
+    queue = deque((n, alpha, 1) for n in carbon_neighbors(alpha))
+    while queue:
+        atom, parent, dist = queue.popleft()
         if atom.GetIdx() in visited:
             continue
         visited.add(atom.GetIdx())
         children = [n for n in carbon_neighbors(atom) if n.GetIdx() != parent.GetIdx()]
         if len(children) >= 2:
-            return True
-        stack.extend((c, atom) for c in children)
-    return False
+            return dist
+        queue.extend((c, atom, dist + 1) for c in children)
+    return None
+
+
+def is_branched_alkyl(mol) -> bool:
+    """Разветвлена ли алкильная цепь -- см. branch_distance_from_root
+    для деталей алгоритма и обоснования BFS."""
+    return branch_distance_from_root(mol) is not None
 
 
 def alkyl_chain_length(mol) -> int:
@@ -103,9 +114,13 @@ def alkyl_chain_length(mol) -> int:
 def rdkit_descriptors(smiles: str) -> dict:
     mol = Chem.MolFromSmiles(smiles)
     assert mol is not None, f"невалидный SMILES: {smiles}"
+    distance = branch_distance_from_root(mol)
     return {
         "n_carbons": alkyl_chain_length(mol),
-        "branched": is_branched_alkyl(mol),
+        "branched": distance is not None,
+        "branch_distance": distance if distance is not None else -1,  # -1 = нет ветки;
+                                                                         # вне диапазона 0..n,
+                                                                         # не путается с "ветка в корне"=0
         "mol_weight": Descriptors.MolWt(mol),
         "logp": Descriptors.MolLogP(mol),
         "tpsa": Descriptors.TPSA(mol),
@@ -141,6 +156,7 @@ def main() -> None:
             "smiles": c.smiles,
             "n_carbons": n,
             "branched": int(branched),
+            "branch_distance": rd["branch_distance"],
             "mol_weight": round(rd["mol_weight"], 3),
             "logp": round(rd["logp"], 3),
             "tpsa": round(rd["tpsa"], 3),
