@@ -1,19 +1,42 @@
-# Байт-код Python
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.egg-info/
+dist/
+build/
+.ipynb_checkpoints/
+
+# ОС-артефакты
 *Zone.Identifier
+.DS_Store
+Thumbs.db
 
-# Данные (не пушим сырые матрицы и таргеты в GitHub)
-data/
+# Данные: тяжёлое и сырое не пушим,
+# но итоговые артефакты нужны для воспроизводимости дашборда
+data/01_raw/
+data/02_interim/xyz/
+data/02_interim/psi4_logs/
 
-# Логи и результаты расчетов
+# Логи и артефакты Psi4
 *.log
 *.out
 *.dat
+*.timer
+psi4.*.clean
 reports/psi4_logs/
 src/dft/reports/
 
 # Среды
 .env
 .venv
+
+# Streamlit
+.streamlit/secrets.toml
+
+cat >> .gitignore <<'GIT'
+
+# AI tooling artifacts
+.agents/
+.claude/
+GIT
