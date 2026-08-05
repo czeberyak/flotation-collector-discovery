@@ -13,7 +13,13 @@ Streamlit-дашборд: библиотека кандидатов, DFT-дес�
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -26,6 +32,8 @@ from src.qspr.dft_surrogate import load_dataset as load_surrogate_dataset
 from src.qspr.model import TARGETS as MODEL_TARGETS
 from src.qspr.model import fit_and_evaluate as fit_model
 from src.qspr.model import load_dataset as load_model_dataset
+
+
 
 QSPR_DATASET_CSV = Path("data/03_processed/qspr_dataset.csv")
 SCREENING_CSV = Path("data/03_processed/screening_ranked.csv")
@@ -109,7 +117,7 @@ with tab_dft:
             xaxis_title="Число атомов C в алкильной цепи",
             yaxis_title="Gap, эВ",
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         st.subheader("Все DFT-дескрипторы (15 исходных)")
         st.dataframe(
