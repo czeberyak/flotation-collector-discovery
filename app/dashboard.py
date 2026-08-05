@@ -16,10 +16,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
+# streamlit run (в отличие от `python3 -m ...`, которым запускаются все
+# остальные скрипты этого проекта) не добавляет корень проекта в
+# sys.path сам -- только директорию самого файла (app/). Без этой
+# строки `from src...` ниже падает с ModuleNotFoundError независимо от
+# текущей рабочей директории при запуске.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -32,8 +34,6 @@ from src.qspr.dft_surrogate import load_dataset as load_surrogate_dataset
 from src.qspr.model import TARGETS as MODEL_TARGETS
 from src.qspr.model import fit_and_evaluate as fit_model
 from src.qspr.model import load_dataset as load_model_dataset
-
-
 
 QSPR_DATASET_CSV = Path("data/03_processed/qspr_dataset.csv")
 SCREENING_CSV = Path("data/03_processed/screening_ranked.csv")
@@ -79,7 +79,7 @@ with tab_candidates:
         st.dataframe(
             df[["name", "smiles", "n_carbons", "branched", "branch_distance",
                 "mol_weight", "logp", "tpsa"]],
-            use_container_width=True, hide_index=True,
+            width='stretch', hide_index=True,
         )
 
 # --------------------------------------------------------- DFT
@@ -117,13 +117,13 @@ with tab_dft:
             xaxis_title="Число атомов C в алкильной цепи",
             yaxis_title="Gap, эВ",
         )
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, width='stretch')
 
         st.subheader("Все DFT-дескрипторы (15 исходных)")
         st.dataframe(
             df[["name", "n_carbons", "branched", "homo_ev", "lumo_ev",
                 "gap_ev", "dipole_debye"]],
-            use_container_width=True, hide_index=True,
+            width='stretch', hide_index=True,
         )
         st.caption(
             "`dipole_debye`: вероятно, origin-dependent артефакт для "
@@ -160,7 +160,7 @@ with tab_qspr:
                 xaxis_title="коэффициент", height=320,
                 margin=dict(l=10, r=10, t=40, b=10),
             )
-            st.plotly_chart(coef_fig, use_container_width=True)
+            st.plotly_chart(coef_fig, width='stretch')
 
         st.divider()
         st.subheader("Суррогат HOMO/gap — только RDKit-фичи, без DFT на входе")
@@ -205,7 +205,7 @@ with tab_screening:
 
         st.dataframe(
             filtered,
-            use_container_width=True, hide_index=True,
+            width='stretch', hide_index=True,
             column_config={
                 "desirability": st.column_config.ProgressColumn(
                     "desirability", min_value=0.0, max_value=1.0, format="%.3f",
@@ -227,5 +227,5 @@ with tab_screening:
         )
         st.dataframe(
             validation_candidates[["name", "smiles", "n_carbons", "gap_ev", "desirability"]],
-            use_container_width=True, hide_index=True,
+            width='stretch', hide_index=True,
         )

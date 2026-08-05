@@ -1,7 +1,19 @@
-numpy
-pandas
+# Streamlit Cloud использует requirements.txt (pip), не environment.yml
+# (conda) -- это разные механизмы, оба нужны отдельно.
+#
+# Дашборд (app/dashboard.py) импортирует только src/qspr/model.py и
+# src/qspr/dft_surrogate.py -- оба читают уже готовые CSV и делают
+# чистую sklearn-регрессию. RDKit и Psi4 тут не нужны и не должны
+# попасть в этот файл: RDKit можно поставить через pip, но громоздко и
+# не нужно дашборду; Psi4 через pip вообще не ставится штатно (только
+# conda-forge) и на Streamlit Cloud не завёлся бы. Полный конвейер
+# (генерация данных) по-прежнему только в локальном environment.yml.
+
+streamlit>=1.28
+plotly>=5.18
+pandas>=2.0
+numpy>=1.24
+scikit-learn>=1.3
 scipy
-scikit-learn
 statsmodels
-rdkit
 plotly
